@@ -106,7 +106,13 @@ def test_findings_endpoint():
     assert "total" in data
 
 
-def test_dashboard_served():
+def test_landing_served():
     res = client.get("/")
+    assert res.status_code == 200
+    assert "Antidote" in res.text
+
+
+def test_dashboard_served():
+    res = client.get("/dashboard")
     assert res.status_code == 200
     assert "Antidote" in res.text

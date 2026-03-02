@@ -30,6 +30,10 @@ if frontend_dir.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 
     @app.get("/")
+    def serve_landing():
+        return FileResponse(str(frontend_dir / "landing.html"))
+
+    @app.get("/dashboard")
     def serve_dashboard():
         return FileResponse(str(frontend_dir / "index.html"))
 
