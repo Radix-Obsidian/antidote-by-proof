@@ -1,0 +1,12 @@
+services:
+  antidote:
+    build: .
+    volumes:
+      - ./src:/src
+      - ./events:/events/antidote
+    environment:
+      - ANTIDOTE_EVENT_DIR=/events/antidote
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
