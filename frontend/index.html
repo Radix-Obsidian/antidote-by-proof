@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Antidote</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -12,7 +14,10 @@
 
     <!-- Nav -->
     <nav>
-        <span class="nav-title">Antidote</span>
+        <div class="nav-brand">
+            <img src="/static/logo.png" alt="Antidote" class="nav-logo">
+            <span class="nav-title">Antidote</span>
+        </div>
         <div class="nav-status" id="health-badge">
             <span class="status-dot" id="health-dot"></span>
             <span id="health-text">Connecting</span>
@@ -22,6 +27,7 @@
     <main>
         <!-- Hero scan -->
         <section class="scan-hero">
+            <img src="/static/logo.png" alt="" class="hero-logo">
             <h1 class="hero-title">Scan your codebase</h1>
             <p class="hero-sub">Deterministic auth-gap detection for Python web frameworks</p>
             <div class="scan-bar">
