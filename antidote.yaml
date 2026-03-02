@@ -1,0 +1,21 @@
+ai:
+  backend: auto            # mlx | ollama | auto
+  mlx_model: mlx-community/Mistral-7B-Instruct-v0.3-4bit
+  ollama_model: llama3.2:3b
+  ollama_host: http://localhost:11434
+  max_tokens: 512
+  temperature: 0.1
+
+scan:
+  extensions: [".py"]
+  exclude_dirs: [".venv", "node_modules", "__pycache__", ".git", "dist", "build"]
+  exclude_files: []
+  max_file_size_kb: 500
+  parallel_workers: 4
+
+events:
+  event_dir: ./events/antidote
+
+server:
+  host: 0.0.0.0
+  port: 8740
