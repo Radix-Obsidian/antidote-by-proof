@@ -9,6 +9,11 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+    <!-- Splash screen -->
+    <div id="splash" class="splash">
+        <img src="/static/logo.png" alt="Antidote by PROOF" class="splash-logo">
+    </div>
+
     <!-- Ambient glow -->
     <div class="ambient-glow"></div>
 
@@ -18,12 +23,9 @@
             <img src="/static/logo.png" alt="Antidote" class="nav-logo">
             <span class="nav-title">Antidote</span>
         </div>
-        <div style="display:flex;align-items:center;gap:16px;">
-        <a href="/" style="font-size:13px;font-weight:500;color:var(--text-3);text-decoration:none;padding:4px 10px;border-radius:8px;transition:color 0.15s ease,background 0.15s ease;" onmouseover="this.style.color='var(--text-2)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--text-3)';this.style.background='transparent'">&larr; Home</a>
         <div class="nav-status" id="health-badge">
             <span class="status-dot" id="health-dot"></span>
             <span id="health-text">Connecting</span>
-        </div>
         </div>
     </nav>
 

@@ -1,5 +1,16 @@
 /* Antidote — Dashboard logic */
 
+// ── Splash screen ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const splash = document.getElementById('splash');
+    if (splash) {
+        setTimeout(() => {
+            splash.classList.add('fade-out');
+            setTimeout(() => splash.remove(), 500);
+        }, 3000);
+    }
+});
+
 const API = '/api';
 
 // ── Health ────────────────────────────────────────────────────

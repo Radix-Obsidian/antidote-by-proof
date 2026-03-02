@@ -35,6 +35,32 @@ body {
     overflow-x: hidden;
 }
 
+/* ── Splash screen ── */
+.splash {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease-out;
+}
+.splash.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+.splash-logo {
+    width: 96px;
+    height: 96px;
+    filter: drop-shadow(0 0 40px rgba(48, 209, 88, 0.12));
+    animation: splash-pulse 2s ease-in-out infinite;
+}
+@keyframes splash-pulse {
+    0%, 100% { opacity: 0.85; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.04); }
+}
+
 /* ── Ambient glow ── */
 .ambient-glow {
     position: fixed;
