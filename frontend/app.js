@@ -1,28 +1,24 @@
-/* Antidote Dashboard — Frontend logic */
+/* Antidote — Dashboard logic */
 
 const API = '/api';
 
-// ── Health check ──────────────────────────────────────────────
+// ── Health ────────────────────────────────────────────────────
 async function checkHealth() {
+    const dot = document.getElementById('health-dot');
+    const text = document.getElementById('health-text');
     try {
         const res = await fetch(`${API}/health`);
         const data = await res.json();
-        const dot = document.getElementById('health-dot');
-        const text = document.getElementById('health-text');
-
         if (data.status === 'healthy') {
-            dot.className = 'w-2 h-2 rounded-full bg-green-500';
-            text.textContent = `Healthy — v${data.version}`;
-            text.className = 'text-green-500 text-sm';
+            dot.className = 'status-dot ok';
+            text.textContent = `v${data.version}`;
         } else {
-            dot.className = 'w-2 h-2 rounded-full bg-yellow-500';
+            dot.className = 'status-dot warn';
             text.textContent = 'Degraded';
-            text.className = 'text-yellow-500 text-sm';
         }
     } catch {
-        document.getElementById('health-dot').className = 'w-2 h-2 rounded-full bg-red-500';
-        document.getElementById('health-text').textContent = 'Offline';
-        document.getElementById('health-text').className = 'text-red-500 text-sm';
+        dot.className = 'status-dot err';
+        text.textContent = 'Offline';
     }
 }
 
@@ -30,35 +26,32 @@ async function checkHealth() {
 async function loadAIStatus() {
     try {
         const res = await fetch(`${API}/ai/status`);
-        const data = await res.json();
+        const d = await res.json();
         const el = document.getElementById('ai-status');
 
-        const mlxBadge = data.mlx.available
-            ? '<span class="text-green-400">Available</span>'
-            : '<span class="text-red-400">Unavailable</span>';
-        const ollamaBadge = data.ollama.available
-            ? '<span class="text-green-400">Available</span>'
-            : '<span class="text-red-400">Unavailable</span>';
+        const mlx = d.mlx.available ? `<span class="badge-ok">Active</span>` : `<span class="badge-err">Inactive</span>`;
+        const oll = d.ollama.available ? `<span class="badge-ok">Active</span>` : `<span class="badge-err">Inactive</span>`;
 
         el.innerHTML = `
-            <div class="space-y-2">
-                <div class="flex justify-between"><span class="text-gray-400">Backend Config</span><span class="font-mono">${data.backend_config}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">MLX</span><span>${mlxBadge} — <span class="font-mono text-xs">${data.mlx.model}</span></span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Ollama</span><span>${ollamaBadge} — <span class="font-mono text-xs">${data.ollama.model}</span></span></div>
+            <div class="ai-card">
+                <div class="ai-card-title">Backends</div>
+                <div class="ai-row"><span class="ai-row-label">Config</span><span class="ai-row-value">${d.backend_config}</span></div>
+                <div class="ai-row"><span class="ai-row-label">MLX</span><span>${mlx}</span></div>
+                <div class="ai-row"><span class="ai-row-label">Ollama</span><span>${oll}</span></div>
             </div>
-            <div class="space-y-2">
-                <div class="flex justify-between"><span class="text-gray-400">Total Requests</span><span class="font-mono">${data.metrics.total_requests}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Avg Latency</span><span class="font-mono">${data.metrics.avg_latency_ms}ms</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Last Backend</span><span class="font-mono">${data.metrics.last_backend_used || '—'}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Failures</span><span class="font-mono">${data.metrics.total_failures}</span></div>
+            <div class="ai-card">
+                <div class="ai-card-title">Metrics</div>
+                <div class="ai-row"><span class="ai-row-label">Requests</span><span class="ai-row-value">${d.metrics.total_requests}</span></div>
+                <div class="ai-row"><span class="ai-row-label">Avg latency</span><span class="ai-row-value">${d.metrics.avg_latency_ms ? d.metrics.avg_latency_ms + 'ms' : '—'}</span></div>
+                <div class="ai-row"><span class="ai-row-label">Last used</span><span class="ai-row-value">${d.metrics.last_backend_used || '—'}</span></div>
+                <div class="ai-row"><span class="ai-row-label">Failures</span><span class="ai-row-value">${d.metrics.total_failures}</span></div>
             </div>
         `;
 
-        // Update stats cards
-        document.getElementById('stat-backend').textContent = data.metrics.last_backend_used || data.backend_config;
-        document.getElementById('stat-latency').textContent = data.metrics.avg_latency_ms ? `${data.metrics.avg_latency_ms}ms` : '—';
+        document.getElementById('stat-backend').textContent = d.metrics.last_backend_used || d.backend_config;
+        document.getElementById('stat-latency').textContent = d.metrics.avg_latency_ms ? `${d.metrics.avg_latency_ms}ms` : '—';
     } catch {
-        document.getElementById('ai-status').innerHTML = '<div class="text-red-400">Failed to load AI status</div>';
+        document.getElementById('ai-status').innerHTML = '<div class="ai-placeholder">Unable to reach AI backend</div>';
     }
 }
 
@@ -68,11 +61,15 @@ async function runScan() {
     if (!target) return;
 
     const btn = document.getElementById('scan-btn');
+    const label = btn.querySelector('.btn-label');
+    const spinner = btn.querySelector('.btn-spinner');
     const status = document.getElementById('scan-status');
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="scan-spinner"></span>';
+    label.classList.add('hidden');
+    spinner.classList.remove('hidden');
     status.classList.remove('hidden');
+    status.className = 'scan-status';
     status.textContent = 'Scanning...';
 
     try {
@@ -88,9 +85,8 @@ async function runScan() {
         }
 
         const data = await res.json();
-
-        status.textContent = `Scan ${data.scan_id}: ${data.files_scanned} files scanned, ${data.total_findings} finding(s)`;
-        status.className = 'mt-3 text-sm text-proof-500';
+        status.textContent = `${data.files_scanned} file${data.files_scanned !== 1 ? 's' : ''} scanned \u00B7 ${data.total_findings} finding${data.total_findings !== 1 ? 's' : ''}`;
+        status.className = 'scan-status ok';
 
         document.getElementById('stat-findings').textContent = data.total_findings;
         document.getElementById('stat-files').textContent = data.files_scanned;
@@ -98,11 +94,12 @@ async function runScan() {
         await loadFindings();
         await loadAIStatus();
     } catch (err) {
-        status.textContent = `Error: ${err.message}`;
-        status.className = 'mt-3 text-sm text-red-400';
+        status.textContent = err.message;
+        status.className = 'scan-status err';
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Scan';
+        label.classList.remove('hidden');
+        spinner.classList.add('hidden');
     }
 }
 
@@ -114,32 +111,32 @@ async function loadFindings() {
         const body = document.getElementById('findings-body');
 
         if (!data.findings.length) {
-            body.innerHTML = '<div class="px-6 py-12 text-center text-gray-600 text-sm">No findings yet. Run a scan to get started.</div>';
+            body.innerHTML = '<div class="empty-state">Run a scan to surface unprotected routes.</div>';
             document.getElementById('stat-findings').textContent = '0';
             return;
         }
 
         document.getElementById('stat-findings').textContent = data.total;
 
-        body.innerHTML = data.findings.map(f => `
-            <div class="finding-row px-6 py-4 flex items-center justify-between hover:bg-surface-700/50 transition cursor-pointer"
+        body.innerHTML = data.findings.map((f, i) => `
+            <div class="finding-row" style="animation-delay:${i * 30}ms"
                  onclick="viewPatch('${f._event_file}', '${f.function}')">
-                <div class="flex items-center gap-4">
-                    <span class="severity-critical">${f.severity}</span>
-                    <div>
-                        <p class="font-mono text-sm">${f.function}</p>
-                        <p class="text-xs text-gray-500">${f.file}:${f.line} &mdash; ${f.rule}</p>
+                <div class="finding-left">
+                    <span class="severity-pip"></span>
+                    <div class="finding-info">
+                        <div class="finding-name">${f.function}</div>
+                        <div class="finding-meta">${f.file}:${f.line}</div>
                     </div>
                 </div>
-                <div class="text-right">
-                    <p class="text-xs text-gray-500">${new Date(f.timestamp).toLocaleString()}</p>
-                    <p class="text-xs text-proof-500 mt-1">View Patch &rarr;</p>
+                <div class="finding-right">
+                    <div class="finding-time">${new Date(f.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                    <div class="finding-action">View patch</div>
                 </div>
             </div>
         `).join('');
     } catch {
         document.getElementById('findings-body').innerHTML =
-            '<div class="px-6 py-8 text-center text-red-400 text-sm">Failed to load findings</div>';
+            '<div class="empty-state" style="color:var(--red)">Failed to load findings</div>';
     }
 }
 
@@ -148,23 +145,20 @@ async function viewPatch(filename, funcName) {
     try {
         const res = await fetch(`${API}/findings/${filename}`);
         const data = await res.json();
-
-        document.getElementById('patch-title').textContent = `Patch: ${funcName}`;
-        document.getElementById('patch-content').textContent = data.patch || '(no patch generated)';
+        document.getElementById('patch-title').textContent = funcName;
+        document.getElementById('patch-content').textContent = data.patch || 'No patch generated';
         document.getElementById('patch-modal').classList.remove('hidden');
-        document.getElementById('patch-modal').classList.add('flex');
     } catch {
-        alert('Failed to load patch');
+        /* silently fail */
     }
 }
 
 function closePatch(event) {
     if (event && event.target !== event.currentTarget) return;
     document.getElementById('patch-modal').classList.add('hidden');
-    document.getElementById('patch-modal').classList.remove('flex');
 }
 
-// ── Keyboard shortcuts ───────────────────────────────────────
+// ── Keys ──────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePatch();
     if (e.key === 'Enter' && e.target.id === 'scan-target') runScan();
@@ -174,6 +168,4 @@ document.addEventListener('keydown', (e) => {
 checkHealth();
 loadAIStatus();
 loadFindings();
-
-// Poll health every 30s
 setInterval(checkHealth, 30000);

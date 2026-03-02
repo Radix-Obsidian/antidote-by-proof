@@ -1,117 +1,100 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antidote by PROOF</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        proof: { 500: '#10b981', 600: '#059669', 700: '#047857' },
-                        surface: { 800: '#1e1e2e', 900: '#11111b', 700: '#313244' }
-                    }
-                }
-            }
-        }
-    </script>
+    <title>Antidote</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body class="bg-surface-900 text-gray-100 min-h-screen">
-    <!-- Header -->
-    <header class="border-b border-surface-700 px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-proof-600 rounded-lg flex items-center justify-center font-bold text-sm">A</div>
-            <div>
-                <h1 class="text-lg font-semibold">Antidote <span class="text-proof-500">by PROOF</span></h1>
-                <p class="text-xs text-gray-500">Sovereign Auth-Gap Scanner</p>
-            </div>
-        </div>
-        <div id="health-badge" class="flex items-center gap-2 text-sm">
-            <span class="w-2 h-2 rounded-full bg-gray-600 animate-pulse" id="health-dot"></span>
-            <span id="health-text" class="text-gray-500">Connecting...</span>
-        </div>
-    </header>
+<body>
+    <!-- Ambient glow -->
+    <div class="ambient-glow"></div>
 
-    <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        <!-- Scan Controls -->
-        <section class="bg-surface-800 rounded-xl p-6 border border-surface-700">
-            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Scan Target</h2>
-            <div class="flex gap-3">
+    <!-- Nav -->
+    <nav>
+        <span class="nav-title">Antidote</span>
+        <div class="nav-status" id="health-badge">
+            <span class="status-dot" id="health-dot"></span>
+            <span id="health-text">Connecting</span>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero scan -->
+        <section class="scan-hero">
+            <h1 class="hero-title">Scan your codebase</h1>
+            <p class="hero-sub">Deterministic auth-gap detection for Python web frameworks</p>
+            <div class="scan-bar">
+                <svg class="scan-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/>
+                </svg>
                 <input
                     id="scan-target"
                     type="text"
-                    placeholder="Path to file or directory (e.g. ./src or app/routes.py)"
-                    class="flex-1 bg-surface-900 border border-surface-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-proof-600 transition"
+                    placeholder="Enter a file or directory path..."
+                    autocomplete="off"
+                    spellcheck="false"
                 >
-                <button
-                    id="scan-btn"
-                    onclick="runScan()"
-                    class="bg-proof-600 hover:bg-proof-700 px-6 py-3 rounded-lg text-sm font-medium transition disabled:opacity-50"
-                >
-                    Scan
+                <button id="scan-btn" onclick="runScan()">
+                    <span class="btn-label">Scan</span>
+                    <span class="btn-spinner hidden"></span>
                 </button>
             </div>
-            <div id="scan-status" class="mt-3 text-sm text-gray-500 hidden"></div>
+            <p id="scan-status" class="scan-status hidden"></p>
         </section>
 
-        <!-- Stats Row -->
-        <section class="grid grid-cols-4 gap-4">
-            <div class="bg-surface-800 rounded-xl p-5 border border-surface-700">
-                <p class="text-xs text-gray-500 uppercase">Findings</p>
-                <p class="text-2xl font-bold mt-1" id="stat-findings">—</p>
+        <!-- Metrics bento -->
+        <section class="metrics">
+            <div class="metric-card">
+                <span class="metric-value" id="stat-findings">&mdash;</span>
+                <span class="metric-label">Findings</span>
             </div>
-            <div class="bg-surface-800 rounded-xl p-5 border border-surface-700">
-                <p class="text-xs text-gray-500 uppercase">Files Scanned</p>
-                <p class="text-2xl font-bold mt-1" id="stat-files">—</p>
+            <div class="metric-card">
+                <span class="metric-value" id="stat-files">&mdash;</span>
+                <span class="metric-label">Files scanned</span>
             </div>
-            <div class="bg-surface-800 rounded-xl p-5 border border-surface-700">
-                <p class="text-xs text-gray-500 uppercase">AI Backend</p>
-                <p class="text-2xl font-bold mt-1" id="stat-backend">—</p>
+            <div class="metric-card">
+                <span class="metric-value" id="stat-backend">&mdash;</span>
+                <span class="metric-label">AI backend</span>
             </div>
-            <div class="bg-surface-800 rounded-xl p-5 border border-surface-700">
-                <p class="text-xs text-gray-500 uppercase">Avg Latency</p>
-                <p class="text-2xl font-bold mt-1" id="stat-latency">—</p>
-            </div>
-        </section>
-
-        <!-- Findings Table -->
-        <section class="bg-surface-800 rounded-xl border border-surface-700">
-            <div class="px-6 py-4 border-b border-surface-700 flex items-center justify-between">
-                <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Findings</h2>
-                <button onclick="loadFindings()" class="text-xs text-proof-500 hover:text-proof-400 transition">Refresh</button>
-            </div>
-            <div id="findings-body" class="divide-y divide-surface-700">
-                <div class="px-6 py-12 text-center text-gray-600 text-sm">No findings yet. Run a scan to get started.</div>
+            <div class="metric-card">
+                <span class="metric-value" id="stat-latency">&mdash;</span>
+                <span class="metric-label">Avg latency</span>
             </div>
         </section>
 
-        <!-- Patch Viewer Modal -->
-        <div id="patch-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50" onclick="closePatch(event)">
-            <div class="bg-surface-800 rounded-xl border border-surface-700 max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
-                <div class="px-6 py-4 border-b border-surface-700 flex items-center justify-between">
-                    <h3 class="font-medium" id="patch-title">Patch</h3>
-                    <button onclick="closePatch()" class="text-gray-500 hover:text-gray-300">&times;</button>
-                </div>
-                <pre id="patch-content" class="p-6 text-sm overflow-auto max-h-[60vh] text-green-400 font-mono"></pre>
+        <!-- Findings -->
+        <section class="findings-section">
+            <div class="section-header">
+                <h2>Findings</h2>
+                <button class="ghost-btn" onclick="loadFindings()">Refresh</button>
             </div>
-        </div>
+            <div id="findings-body" class="findings-list">
+                <div class="empty-state">Run a scan to surface unprotected routes.</div>
+            </div>
+        </section>
 
         <!-- AI Status -->
-        <section class="bg-surface-800 rounded-xl p-6 border border-surface-700">
-            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">AI Backend Status</h2>
-            <div id="ai-status" class="grid grid-cols-2 gap-4 text-sm">
-                <div class="text-gray-500">Loading AI status...</div>
+        <section class="ai-section">
+            <div class="section-header">
+                <h2>Inference</h2>
+            </div>
+            <div id="ai-status" class="ai-grid">
+                <div class="ai-placeholder">Loading...</div>
             </div>
         </section>
     </main>
 
-    <footer class="border-t border-surface-700 px-6 py-4 mt-12 text-center text-xs text-gray-600">
-        Antidote by PROOF &mdash; Sovereign Infrastructure Security for the PROOF Box
-    </footer>
+    <!-- Patch modal -->
+    <div id="patch-modal" class="modal-overlay hidden" onclick="closePatch(event)">
+        <div class="modal-panel" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="patch-title">Patch</h3>
+                <button class="modal-close" onclick="closePatch()">&times;</button>
+            </div>
+            <pre id="patch-content" class="modal-code"></pre>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>
