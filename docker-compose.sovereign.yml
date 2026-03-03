@@ -1,21 +1,36 @@
+# Antidote by PROOF — Pillar 3: Infrastructure Integrity
+# Production compose for PROOF Box deployment
 services:
   antidote:
-    build: .
+    image: ghcr.io/proof-by/antidote:latest
+    container_name: proof-antidote
     ports:
       - "8740:8740"
     volumes:
-      - ./src:/src
-      - ./events:/events/antidote
-      - ./antidote.yaml:/app/antidote.yaml:ro
+      - ${PROOF_SRC_DIR:-/app/src}:/src:ro
+      - ${PROOF_EVENTS_DIR:-/app/events}:/events
+      - ${PROOF_CONFIG_DIR:-/app/config}/antidote.yaml:/app/antidote.yaml:ro
     environment:
       - ANTIDOTE_EVENT_DIR=/events/antidote
       - ANTIDOTE_BACKEND=ollama
       - OLLAMA_HOST=http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    labels:
+      - "proof.pillar=antidote"
+      - "proof.version=1.0.0"
+      - "proof.port=8740"
+    networks:
+      - proof
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8740/api/health')"]
       interval: 30s
       timeout: 5s
+      start_period: 10s
       retries: 3
+
+networks:
+  proof:
+    external: true
+    name: proof

@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────
+# Antidote by PROOF — One-Command Install Script
+# Pillar 3: Sovereign Auth Gap Scanner
+#
+# Usage:
+#   curl -sSL https://raw.githubusercontent.com/Radix-Obsidian/antidote-by-proof/main/antidote-install.sh | bash
+#   — or —
+#   ./antidote-install.sh
+# ──────────────────────────────────────────────────────────────
+set -euo pipefail
+
+ANTIDOTE_VERSION="1.0.0"
+ANTIDOTE_IMAGE="ghcr.io/proof-by/antidote:latest"
+ANTIDOTE_PORT=8740
+ANTIDOTE_CONTAINER="proof-antidote"
+
+# ── Colors ────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+info()  { echo -e "${BLUE}[PROOF]${NC} $*"; }
+ok()    { echo -e "${GREEN}[  OK ]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[WARN ]${NC} $*"; }
+fail()  { echo -e "${RED}[FAIL ]${NC} $*"; exit 1; }
+
+# ── Detect PROOF Box ──────────────────────────────────────────
+PROOF_BOX=false
+PROOF_BASE=""
+COMPOSE_FILE=""
+
+detect_proof_box() {
+    if [ -f "/app/docker-compose.sovereign.yml" ]; then
+        PROOF_BOX=true
+        PROOF_BASE="/app"
+    elif docker ps --filter "label=proof.pillar" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+        PROOF_BOX=true
+        PROOF_BASE="/app"
+    fi
+
+    if [ "$PROOF_BOX" = true ]; then
+        info "PROOF Box detected at ${PROOF_BASE}"
+    else
+        info "Standalone install mode"
+        PROOF_BASE="$(pwd)"
+    fi
+}
+
+# ── Prerequisites ─────────────────────────────────────────────
+check_prerequisites() {
+    command -v docker >/dev/null 2>&1 || fail "Docker is required but not installed"
+    docker info >/dev/null 2>&1 || fail "Docker daemon is not running"
+    ok "Docker available"
+
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+        ok "Architecture: ARM64 (Apple Silicon)"
+    else
+        warn "Architecture: ${ARCH} — Apple Silicon recommended"
+    fi
+}
+
+# ── Ollama Check ──────────────────────────────────────────────
+check_ollama() {
+    local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"
+
+    if curl -sf "${ollama_host}/api/tags" >/dev/null 2>&1; then
+        ok "Ollama running at ${ollama_host}"
+
+        if curl -sf "${ollama_host}/api/tags" 2>/dev/null | grep -q "llama3.2"; then
+            ok "Model llama3.2:3b available"
+        else
+            info "Pulling llama3.2:3b model..."
+            if curl -sf "${ollama_host}/api/pull" -d '{"name":"llama3.2:3b"}' >/dev/null 2>&1; then
+                ok "Model pulled"
+            else
+                warn "Could not pull model — patching will be unavailable"
+            fi
+        fi
+    else
+        warn "Ollama not reachable at ${ollama_host}"
+        warn "Antidote will run in scan-only mode (detection works, patching disabled)"
+    fi
+}
+
+# ── Directory Structure ───────────────────────────────────────
+create_directories() {
+    local events_dir="${PROOF_BASE}/events/antidote"
+    local config_dir="${PROOF_BASE}/config"
+    local src_dir="${PROOF_BASE}/src"
+
+    mkdir -p "$events_dir" "$config_dir" "$src_dir"
+    ok "Directory structure ready"
+
+    if [ ! -f "${config_dir}/antidote.yaml" ]; then
+        cat > "${config_dir}/antidote.yaml" << 'YAML'
+ai:
+  backend: ollama
+  ollama_model: llama3.2:3b
+  ollama_host: http://host.docker.internal:11434
+  max_tokens: 512
+  temperature: 0.1
+
+scan:
+  extensions: [".py"]
+  exclude_dirs: [".venv", "node_modules", "__pycache__", ".git", "dist", "build"]
+  max_file_size_kb: 500
+  parallel_workers: 4
+
+events:
+  event_dir: /events/antidote
+
+server:
+  host: 0.0.0.0
+  port: 8740
+YAML
+        ok "Config written: ${config_dir}/antidote.yaml"
+    else
+        ok "Config exists: ${config_dir}/antidote.yaml"
+    fi
+}
+
+# ── Pull Image ────────────────────────────────────────────────
+pull_image() {
+    info "Pulling Antidote image..."
+    if docker pull "$ANTIDOTE_IMAGE" 2>/dev/null; then
+        ok "Image: ${ANTIDOTE_IMAGE}"
+    else
+        warn "GHCR pull failed — building locally"
+        if [ -f "${PROOF_BASE}/Dockerfile" ]; then
+            docker build -t "$ANTIDOTE_IMAGE" "$PROOF_BASE"
+            ok "Image built locally"
+        elif [ -f "./Dockerfile" ]; then
+            docker build -t "$ANTIDOTE_IMAGE" "."
+            ok "Image built locally"
+        else
+            fail "Cannot pull or build Antidote image"
+        fi
+    fi
+}
+
+# ── Docker Network ────────────────────────────────────────────
+ensure_network() {
+    if docker network inspect proof >/dev/null 2>&1; then
+        ok "Network 'proof' exists"
+    else
+        docker network create proof >/dev/null
+        ok "Network 'proof' created"
+    fi
+}
+
+# ── Write Compose ─────────────────────────────────────────────
+write_compose() {
+    COMPOSE_FILE="${PROOF_BASE}/docker-compose.antidote.yml"
+
+    cat > "$COMPOSE_FILE" << YAML
+# Antidote by PROOF — Pillar 3: Auth Gap Scanner
+# Generated by antidote-install.sh v${ANTIDOTE_VERSION}
+services:
+  antidote:
+    image: ${ANTIDOTE_IMAGE}
+    container_name: ${ANTIDOTE_CONTAINER}
+    ports:
+      - "${ANTIDOTE_PORT}:8740"
+    volumes:
+      - ${PROOF_BASE}/src:/src:ro
+      - ${PROOF_BASE}/events:/events
+      - ${PROOF_BASE}/config/antidote.yaml:/app/antidote.yaml:ro
+    environment:
+      - ANTIDOTE_EVENT_DIR=/events/antidote
+      - ANTIDOTE_BACKEND=ollama
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - "proof.pillar=antidote"
+      - "proof.version=${ANTIDOTE_VERSION}"
+      - "proof.port=${ANTIDOTE_PORT}"
+    networks:
+      - proof
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8740/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+networks:
+  proof:
+    external: true
+YAML
+
+    ok "Compose: ${COMPOSE_FILE}"
+}
+
+# ── Start Container ───────────────────────────────────────────
+start_antidote() {
+    # Stop existing if running (idempotent)
+    if docker ps -q --filter "name=${ANTIDOTE_CONTAINER}" 2>/dev/null | grep -q .; then
+        info "Stopping existing Antidote container..."
+        docker stop "$ANTIDOTE_CONTAINER" >/dev/null 2>&1 || true
+        docker rm "$ANTIDOTE_CONTAINER" >/dev/null 2>&1 || true
+    fi
+
+    info "Starting Antidote..."
+    docker compose -f "$COMPOSE_FILE" up -d
+    ok "Container started"
+}
+
+# ── Health Check ──────────────────────────────────────────────
+wait_for_health() {
+    info "Waiting for health check..."
+    local max_attempts=30
+    local attempt=0
+
+    while [ $attempt -lt $max_attempts ]; do
+        attempt=$((attempt + 1))
+
+        local response
+        response=$(curl -sf "http://localhost:${ANTIDOTE_PORT}/api/health" 2>/dev/null || echo "")
+
+        if [ -n "$response" ]; then
+            local status
+            status=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+
+            if [ "$status" = "healthy" ]; then
+                ok "Antidote is healthy"
+                return 0
+            elif [ "$status" = "degraded" ]; then
+                ok "Antidote running (degraded — AI unavailable, scanning works)"
+                return 0
+            fi
+        fi
+
+        sleep 2
+    done
+
+    fail "Antidote did not become healthy within 60 seconds"
+}
+
+# ── Summary ───────────────────────────────────────────────────
+print_summary() {
+    echo ""
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}${BOLD}  ✓ Antidote by PROOF — Installed${NC}"
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  Dashboard   ${BLUE}http://localhost:${ANTIDOTE_PORT}${NC}"
+    echo -e "  API         ${BLUE}http://localhost:${ANTIDOTE_PORT}/api/health${NC}"
+    echo -e "  Container   ${DIM}${ANTIDOTE_CONTAINER}${NC}"
+    echo -e "  Events      ${DIM}${PROOF_BASE}/events/antidote/${NC}"
+    echo -e "  Config      ${DIM}${PROOF_BASE}/config/antidote.yaml${NC}"
+    echo ""
+
+    if [ "$PROOF_BOX" = true ]; then
+        echo -e "  ${GREEN}◉${NC} PROOF Box integration active"
+        echo -e "  ${DIM}Events flowing to Comply & Viper${NC}"
+        echo -e "  ${DIM}Zero extra hardware required${NC}"
+    fi
+
+    echo ""
+}
+
+# ── Main ──────────────────────────────────────────────────────
+main() {
+    echo ""
+    echo -e "${BOLD}Antidote by PROOF${NC} ${DIM}v${ANTIDOTE_VERSION}${NC}"
+    echo -e "${DIM}Sovereign Auth Gap Scanner${NC}"
+    echo ""
+
+    detect_proof_box
+    check_prerequisites
+    check_ollama
+    create_directories
+    pull_image
+    ensure_network
+    write_compose
+    start_antidote
+    wait_for_health
+    print_summary
+}
+
+main "$@"
